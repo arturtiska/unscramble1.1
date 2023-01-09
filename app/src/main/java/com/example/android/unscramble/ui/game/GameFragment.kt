@@ -17,55 +17,64 @@
 package com.example.android.unscramble.ui.game
 
 import android.os.Bundle
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.databinding.DataBindingUtil
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import com.example.android.unscramble.R
 import com.example.android.unscramble.databinding.GameFragmentBinding
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 
-/**
- * Fragment where the game is played, contains the game logic.
- */
+
+//Fragmento onde o jogo é jogado, contém a lógica do jogo.
 class GameFragment : Fragment() {
 
-
-    private val viewmodel: GameViewModel by viewModels()
+    // Instância de objeto de associação com acesso aos modos de exibição no layout game_fragment.xml
     private lateinit var binding: GameFragmentBinding
+
+    //Crie um ViewModel na primeira vez que o fragmento for criado.
+    //Se o fragmento for recriado, ele receberá a mesma instância do GameViewModel criada pelo
+    //primeiro fragmento.
+    private val viewmodel: GameViewModel by viewModels()
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
 
-        binding = GameFragmentBinding.inflate(inflater, container, false)
-        Log.d("GameFragment", "GameFragment created/re-created!")
-        Log.d("GameFragment", "Word: ${viewmodel.currentScrambledWord} " +
-                "Score: ${viewmodel.score} WordCount: ${viewmodel.currentWordCount}")
+        //Inflar o arquivo XML de layout e retornar uma instância de objeto de vinculação
+        binding = DataBindingUtil.inflate(inflater, R.layout.game_fragment, container, false)
         return binding.root
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-
         super.onViewCreated(view, savedInstanceState)
+
+        //Definir o viewModel para vinculação de dados - isso permite o acesso ao layout acoplado
+        //a todos os dados no VieWModel
+        binding.gameViewModel = viewmodel
+        binding.maxNoOfWords = MAX_NO_OF_WORDS
+
+        //Especifique a visualização de fragmento como o proprietário do ciclo de vida da associação.
+        //Isso é usado para que a associação possa observar as atualizações do LiveData
+        binding.lifecycleOwner = viewLifecycleOwner
+
+        //Configure um ouvinte de clique para os botões Enviar e Ignorar.
         binding.submit.setOnClickListener { onSubmitWord() }
         binding.skip.setOnClickListener { onSkipWord() }
-        updateNextWordOnScreen()
-        binding.score.text = getString(R.string.score, 0)
-        binding.wordCount.text = getString(R.string.word_count, 0, MAX_NO_OF_WORDS)
     }
 
+    //Verifica a palavra do usuário e atualiza a pontuação de acordo.
+    //Exibe a próxima palavra embaralhada.
+    //Após a última palavra, o usuário é mostrado um diálogo com a pontuação final.
     private fun onSubmitWord() {
         val playerWord = binding.textInputEditText.text.toString()
 
         if (viewmodel.isUserWordCorrect(playerWord)) {
             setErrorTextField(false)
-            if (viewmodel.nextWord()) {
-                updateNextWordOnScreen()
-            } else {
+            if (!viewmodel.nextWord()) {
                 showFinalScoreDialog()
             }
         } else {
@@ -73,45 +82,46 @@ class GameFragment : Fragment() {
         }
 
     }
+
+    /*
+     * Ignora a palavra atual sem alterar a pontuação.
+     * Aumenta a contagem de palavras.
+     * Após a última palavra, o usuário é mostrado um diálogo com a pontuação final.
+     */
     private fun onSkipWord() {
         if (viewmodel.nextWord()) {
             setErrorTextField(false)
-            updateNextWordOnScreen()
         } else {
             showFinalScoreDialog()
         }
     }
 
-    private fun getNextScrambledWord(): String {
-        val tempWord = allWordsList.random().toCharArray()
-        tempWord.shuffle()
-        return String(tempWord)
-    }
-
-   private fun showFinalScoreDialog() {
+    //Cria e mostra um AlertDialog com pontuação final.
+    private fun showFinalScoreDialog() {
         MaterialAlertDialogBuilder(requireContext())
             .setTitle(getString(R.string.congratulations))
-            .setMessage(getString(R.string.you_scored, viewmodel.score))
+            .setMessage(getString(R.string.you_scored, viewmodel.score.value))
             .setCancelable(false)
             .setNegativeButton(getString(R.string.exit)) { _, _ -> exitGame() }
             .setPositiveButton(getString(R.string.play_again)) { _, _ -> restartGame() }
             .show()
     }
 
+    /*
+     * Reinicializa os dados no ViewModel e atualiza as visualizações com os novos dados, para
+     * reinicie o jogo.
+     */
     private fun restartGame() {
         viewmodel.reinitializeData()
         setErrorTextField(false)
-        updateNextWordOnScreen()
     }
 
+    //sai do jogo
     private fun exitGame() {
         activity?.finish()
     }
 
-    override fun onDetach() {
-        super.onDetach()
-        Log.d("GameFragment", "GameFragment destroyed!")
-    }
+    //Define e redefine o status de erro do campo de texto.
     private fun setErrorTextField(error: Boolean) {
         if (error) {
             binding.textField.isErrorEnabled = true
@@ -121,7 +131,5 @@ class GameFragment : Fragment() {
             binding.textInputEditText.text = null
         }
     }
-    private fun updateNextWordOnScreen() {
-        binding.textViewUnscrambledWord.text = viewmodel.currentScrambledWord
-    }
+
 }
